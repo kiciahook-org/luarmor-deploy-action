@@ -7,9 +7,9 @@ Deploy your script file to Luarmor.
 > This is due to limitations imposed by Luarmor themselves.
 
 This fork rejects every non-success Luarmor response and reports only its HTTP
-status plus the API's bounded `message` field. A `504` from the update endpoint
-is handled by polling the exact script for a changed version for up to two
-minutes; every other non-2xx response fails the action immediately.
+status plus the API's bounded `message` field. It also rejects `success: false`
+payloads returned with HTTP 200. Every accepted update, including a `504`,
+must change the exact script's observable version within two minutes.
 
 ## Inputs
 
@@ -61,7 +61,7 @@ jobs:
       uses: actions/checkout@v2
 
     - name: Deploy to Luarmor
-      uses: kiciahook-org/luarmor-deploy-action@v2.0.1
+      uses: kiciahook-org/luarmor-deploy-action@v2.0.2
       with:
         twocaptcha-api-key: ${{ secrets.TWOCAPTCHA_API_KEY }}
         api-key: ${{ secrets.LUARMOR_API_KEY }}

@@ -3,7 +3,7 @@ import * as fs from "fs";
 import { setFailed, getInput } from "@actions/core";
 import { stateActionHandler } from "fetch-rate-limit-util";
 import { Solver } from "@2captcha/captcha-solver";
-import { requireSuccessfulResponse } from "./response.mjs";
+import { requireSuccessfulResponse, requireSuccessfulUpdateResponse } from "./response.mjs";
 
 /**
  * The main entry point
@@ -58,10 +58,9 @@ async function run() {
     solver
   );
 
-  // Luarmor may finish processing after its edge returns 504.
-  if (updateResponse.status === 504) {
-    await pollVersionNumber(apiKey, project.id, scriptId, currentVersion);
-  }
+  // An accepted request is not deployment proof. Wait for the exact script's
+  // externally observable version to change, including after a 2xx response.
+  await pollVersionNumber(apiKey, project.id, scriptId, currentVersion);
 }
 
 /**
@@ -191,20 +190,16 @@ async function updateScript(
     })
     .then((x) => x.data);
 
-  // Update the script, returning the response
-  return await sendFetch(
-    pageUrl,
-    {
-      method: "PUT",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: apiKey,
-        "x-turnstile-token": cfTurnstile,
-      },
-      body: JSON.stringify(scriptData),
+  const response = await stateActionHandler(pageUrl, {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: apiKey,
+      "x-turnstile-token": cfTurnstile,
     },
-    true
-  );
+    body: JSON.stringify(scriptData),
+  });
+  return requireSuccessfulUpdateResponse(response);
 }
 
 // Run the entrypoint, handling errors

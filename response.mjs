@@ -21,3 +21,20 @@ export async function requireSuccessfulResponse(response, { allowGatewayTimeout 
   if (response.ok || (allowGatewayTimeout && response.status === 504)) return response;
   throw await responseError(response);
 }
+
+export async function requireSuccessfulUpdateResponse(response) {
+  await requireSuccessfulResponse(response, { allowGatewayTimeout: true });
+  if (response.status === 504) return response;
+  try {
+    const body = await response.clone().json();
+    if (body?.success === false) {
+      const message = cleanMessage(body.message);
+      const suffix = message ? `: ${message}` : "";
+      throw new Error(`Luarmor update rejected (HTTP ${response.status})${suffix}`);
+    }
+  } catch (error) {
+    if (error instanceof SyntaxError) return response;
+    throw error;
+  }
+  return response;
+}

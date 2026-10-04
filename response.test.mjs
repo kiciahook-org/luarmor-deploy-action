@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { requireSuccessfulResponse } from "./response.mjs";
+import { requireSuccessfulResponse, requireSuccessfulUpdateResponse } from "./response.mjs";
 
 test("accepts successful responses", async () => {
   const response = new Response("", { status: 200 });
@@ -15,6 +15,16 @@ test("rejects a Luarmor error with its bounded message", async () => {
   });
   await assert.rejects(requireSuccessfulResponse(response), {
     message: "Luarmor request failed (HTTP 500): Script is too large for this channel.",
+  });
+});
+
+test("rejects a false success payload even with HTTP 200", async () => {
+  const response = new Response(JSON.stringify({ success: false, message: "Script is too large for this channel." }), {
+    status: 200,
+    headers: { "content-type": "application/json" },
+  });
+  await assert.rejects(requireSuccessfulUpdateResponse(response), {
+    message: "Luarmor update rejected (HTTP 200): Script is too large for this channel.",
   });
 });
 
