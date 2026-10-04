@@ -1,6 +1,6 @@
 {
   "name": "luarmor-deploy-action",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "description": "Deploy your script file to Luarmor.",
   "main": "index.mjs",
   "keywords": [
@@ -12,6 +12,9 @@
   ],
   "author": "Stefanuk12",
   "license": "MIT",
+  "scripts": {
+    "test": "node --test"
+  },
   "dependencies": {
     "@2captcha/captcha-solver": "^1.3.0",
     "@actions/core": "^1.11.1",

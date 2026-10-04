@@ -6,6 +6,11 @@ Deploy your script file to Luarmor.
 > You must self-host your GitHub runner and whitelist your server's IP on the Luarmor site for this to work.
 > This is due to limitations imposed by Luarmor themselves.
 
+This fork rejects every non-success Luarmor response and reports only its HTTP
+status plus the API's bounded `message` field. A `504` from the update endpoint
+is handled by polling the exact script for a changed version for up to two
+minutes; every other non-2xx response fails the action immediately.
+
 ## Inputs
 
 ![an image showing the project-id and script-id](./assets/inputsExample.png)
@@ -56,7 +61,7 @@ jobs:
       uses: actions/checkout@v2
 
     - name: Deploy to Luarmor
-      uses: stefanuk12/luarmor-deploy-action@v1.0.0
+      uses: kiciahook-org/luarmor-deploy-action@v2.0.1
       with:
         twocaptcha-api-key: ${{ secrets.TWOCAPTCHA_API_KEY }}
         api-key: ${{ secrets.LUARMOR_API_KEY }}

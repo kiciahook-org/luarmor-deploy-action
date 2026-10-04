@@ -3,6 +3,7 @@ import * as fs from "fs";
 import { setFailed, getInput } from "@actions/core";
 import { stateActionHandler } from "fetch-rate-limit-util";
 import { Solver } from "@2captcha/captcha-solver";
+import { requireSuccessfulResponse } from "./response.mjs";
 
 /**
  * The main entry point
@@ -57,42 +58,23 @@ async function run() {
     solver
   );
 
-  // Poll for the new version number, if was 504
+  // Luarmor may finish processing after its edge returns 504.
   if (updateResponse.status === 504) {
-    await pollVersionNumber(apiKey, project.id, currentVersion);
+    await pollVersionNumber(apiKey, project.id, scriptId, currentVersion);
   }
 }
 
 /**
- * Handles responses, checking mostly for custom errors
+ * Rejects every non-2xx response except an explicitly allowed update timeout.
  * @param {string} url - The URL to fetch
  * @param {object} options - The fetch options
- * @param {boolean?} ignoreTimeout - Does not error on HTTP Error 504
- * @returns {Promise<Response>} The fetch response
- * @throws {Error} If a custom error is encountered
+ * @param {boolean} [allowGatewayTimeout=false] - Allow a 504 for asynchronous update polling
+ * @returns {Promise<Response>} The successful response
+ * @throws {Error} If the request is rejected
  */
-async function sendFetch(url, options, ignoreTimeout) {
+async function sendFetch(url, options, allowGatewayTimeout = false) {
   const response = await stateActionHandler(url, options);
-
-  switch (response.status) {
-    // Bad request, usually invalid API key
-    case 400:
-      throw new Error("400, is your API key valid?");
-    // Forbidden, usually called due to not whitelisting your IP
-    case 403:
-      throw new Error(
-        "403, is your IP whitelisted and is your API key correct?"
-      );
-    // Purposefully ignore Gateway Timeouts, usually due to script upload being too big
-    case 504:
-      if (!ignoreTimeout) {
-        break;
-      }
-    default:
-      break;
-  }
-
-  return response;
+  return requireSuccessfulResponse(response, { allowGatewayTimeout });
 }
 
 /**
@@ -162,29 +144,26 @@ function getScript(project, scriptId) {
 }
 
 /**
- * Poll for the new version number until it changes
+ * Poll for a changed script version after an update gateway timeout.
  * @param {string} apiKey - The API key
- * @param {string} projectId - The script's project id
- * @param {object} oldScript - The previous script information
+ * @param {string} projectId - The project's id
+ * @param {string} scriptId - The script's id
+ * @param {string} oldVersion - The version before upload
  * @returns {Promise<void>}
  */
-async function pollVersionNumber(apiKey, projectId, oldScript) {
-  const pollInterval = 5000; // 5 seconds
-
-  while (true) {
-    // Find the project that contains the script and then get its version
+async function pollVersionNumber(apiKey, projectId, scriptId, oldVersion) {
+  const deadline = Date.now() + 120000;
+  while (Date.now() < deadline) {
     const details = await getKeyDetails(apiKey);
-    const project = resolveProject(details, oldScript.script_id, projectId);
-    const newScript = project ? getScript(project, scriptId) : undefined;
-    const newVersion = newScript?.script_version;
-
-    if (newVersion !== oldScript.script_version) {
+    const project = resolveProject(details, scriptId, projectId);
+    const newVersion = project ? getScript(project, scriptId)?.script_version : undefined;
+    if (newVersion && newVersion !== oldVersion) {
       console.log(`New script version: ${newVersion}`);
-      break;
+      return;
     }
-
-    await new Promise((resolve) => setTimeout(resolve, pollInterval));
+    await new Promise((resolve) => setTimeout(resolve, 5000));
   }
+  throw new Error("Luarmor script version did not change within 120 seconds");
 }
 
 /**
